@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Tuple
 import json
 import os, glob, shutil
 from pathlib import Path
-from .vantage_project import get_vantage_dir
+from .nebula_project import get_nebula_dir
 
 import numpy as np
 
@@ -45,8 +45,8 @@ def _to(x: torch.Tensor, device, dtype):
     return x
 
 # ——— disk I/O helpers ———
-def _get_root_vantage_dir() -> Path:
-    return Path(get_vantage_dir())
+def _get_root_nebula_dir() -> Path:
+    return Path(get_nebula_dir())
     
 def _ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
@@ -104,7 +104,7 @@ def _load_all_frames(project_dir: Path) -> torch.Tensor:
     t = torch.from_numpy(arr)  # (F,H,W,C) float in [0,1]
     return t
 
-class VantageSingleLooperI2V:
+class NebulaSingleLooperI2V:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -290,8 +290,8 @@ class VantageSingleLooperI2V:
         loop_idx = 0
 
         # Prepare disk paths
-        root_vantage = _get_root_vantage_dir()
-        project_dir = root_vantage / project_id
+        root_nebula = _get_root_nebula_dir()
+        project_dir = root_nebula / project_id
         _ensure_dir(project_dir)
         
         # Parse start_prompt from project_data
@@ -316,7 +316,7 @@ class VantageSingleLooperI2V:
         if start_prompt_idx < 0:
             start_prompt_idx = 0
         if start_prompt_idx > max_prompt_idx:
-            _log(f"[Vantage Single Looper] start_prompt {start_prompt_idx} out of range (prompt_lines={len(prompt_lines)}); resetting to 0.")
+            _log(f"[Nebula Single Looper] start_prompt {start_prompt_idx} out of range (prompt_lines={len(prompt_lines)}); resetting to 0.")
             start_prompt_idx = 0
         
         # After clamping, walk backward until a valid prev restart folder exists (start_prompt_idx - 1)
@@ -335,14 +335,14 @@ class VantageSingleLooperI2V:
             start_prompt_idx -= 1 
 
         if original_spi != start_prompt_idx:
-            _log(f"Vantage Single Looper: adjusted start_prompt_idx from {original_spi} to {start_prompt_idx} based on restart folder availability.")
+            _log(f"Nebula Single Looper: adjusted start_prompt_idx from {original_spi} to {start_prompt_idx} based on restart folder availability.")
 
         # With final start_prompt_idx, compute produced frames and try to load resume seed
         frames_per_prompt = int(fps_val) * 5  # 5 seconds per prompt line
    
         produced_frames = int(start_prompt_idx) * frames_per_prompt
         
-        _log(f"Vantage Single Looper: resume produced_frames set to {produced_frames} (start_prompt={start_prompt_idx}, fps={fps_val}, frames_per_prompt={frames_per_prompt}).") 
+        _log(f"Nebula Single Looper: resume produced_frames set to {produced_frames} (start_prompt={start_prompt_idx}, fps={fps_val}, frames_per_prompt={frames_per_prompt}).") 
 
         resume_seed_image = None
         if start_prompt_idx > 0:
@@ -356,7 +356,7 @@ class VantageSingleLooperI2V:
                         im = Image.open(pngs[-1]).convert("RGBA" if pngs[-1].lower().endswith(".png") else "RGB")
                         arr = np.array(im).astype(np.float32) / 255.0  # H,W,C
                         resume_seed_image = torch.from_numpy(arr).unsqueeze(0)  # (1,H,W,C)
-                        _log(f"[Vantage Single Looper] resume image seed from {pngs[-1]}")
+                        _log(f"[Nebula Single Looper] resume image seed from {pngs[-1]}")
                     except Exception:
                         try:
                             import imageio.v3 as iio
@@ -365,17 +365,17 @@ class VantageSingleLooperI2V:
                                 im = np.stack([im]*3, axis=-1)
                             arr = im.astype(np.float32) / 255.0
                             resume_seed_image = torch.from_numpy(arr).unsqueeze(0)
-                            _log(f"[Vantage Single Looper] resume seed via imageio from {pngs[-1]}")
+                            _log(f"[Nebula Single Looper] resume seed via imageio from {pngs[-1]}")
                         except Exception as e:
-                            _log(f"[Vantage Single Looper] failed to read last image for resume: {e}")
+                            _log(f"[Nebula Single Looper] failed to read last image for resume: {e}")
         # Clean current and future loop folders
         to_delete = [p for p in project_dir.iterdir() if p.is_dir() and p.name.isdigit() and int(p.name) >= start_prompt_idx]
         for p in sorted(to_delete, key=lambda x: int(x.name)):
             try:
                 shutil.rmtree(p, ignore_errors=True)
-                _log(f"[Vantage Single Looper] removed folder {p}")
+                _log(f"[Nebula Single Looper] removed folder {p}")
             except Exception as e:
-                _log(f"[Vantage Single Looper] could not remove {p}: {e}")
+                _log(f"[Nebula Single Looper] could not remove {p}: {e}")
 
         prev_seed_image = None  # BHWC float [0,1], single frame selected by overlap
         
@@ -400,10 +400,10 @@ class VantageSingleLooperI2V:
             )
 
             if clip_lats["samples"].device.type == "cuda":
-                _log(f"[Vantage Single Looper] Clip Vision Latent device cuda")
+                _log(f"[Nebula Single Looper] Clip Vision Latent device cuda")
                 parts.append(_to(clip_lats["samples"], cpu, torch.float32))
             else:
-                _log(f"[Vantage Single Looper] Clip Vision Latent device cpu")
+                _log(f"[Nebula Single Looper] Clip Vision Latent device cpu")
                 parts.append(clip_lats["samples"])
 
             full = parts[0]
@@ -413,7 +413,7 @@ class VantageSingleLooperI2V:
             remaining = (total_frames - produced_frames)
             win_T = min(L, remaining + 1)
             contrib = win_T  # decoded frames this window before any discard
-            _log(f"[Vantage Single Looper] remaining={remaining}, win_T={win_T}, contrib={contrib}, produced={produced_frames}")
+            _log(f"[Nebula Single Looper] remaining={remaining}, win_T={win_T}, contrib={contrib}, produced={produced_frames}")
 
 
             # Positive prompt: select line by loop index (clamped)
@@ -423,7 +423,7 @@ class VantageSingleLooperI2V:
                 pos_str = prompt_lines[-1] if prompt_lines else ""
             positive, _ = self._encode_prompts_clip(clip, pos_str, "")
 
-            _log(f"[Vantage Single Looper] {pos_str}")
+            _log(f"[Nebula Single Looper] {pos_str}")
 
             # Build latent window on CPU, then move to model device/dtype
             positive, negative, win_lat_cpu = build_window_latent(win_T, positive, negative, loop_idx)
@@ -491,7 +491,7 @@ class VantageSingleLooperI2V:
                 else:
                     prev_seed_image = None
             except Exception as e:
-                _log(f"[Vantage Single Looper] warning: could not cache seed frame: {e}")
+                _log(f"[Nebula Single Looper] warning: could not cache seed frame: {e}")
                 prev_seed_image = None
 
             # Update counters to reflect frames that advance the timeline after discarding
@@ -514,7 +514,7 @@ class VantageSingleLooperI2V:
             if torch.cuda.is_available():
                 torch.cuda.memory.empty_cache()
 
-        _log(f"[Vantage Single Looper] done, produced {produced_frames} frames (target {total_frames}).")
+        _log(f"[Nebula Single Looper] done, produced {produced_frames} frames (target {total_frames}).")
 
         # Load all frames from disk and return as IMAGE
         all_frames = _load_all_frames(project_dir)  # (F,H,W,C) float [0,1]

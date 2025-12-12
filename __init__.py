@@ -1,20 +1,23 @@
-from .vantage_project import VantageProject
-from .vantage_server import preload  
-from .single_looper import VantageSingleLooperI2V
-from .dual_looper import VantageDualLooperI2V
+from .nebula_project import NebulaProject
+from .nebula_server import preload  
+from .single_looper import NebulaSingleLooperI2V
+from .dual_looper import NebulaDualLooperI2V
+from .nebula_live_preview import NebulaLivePreview
 
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
-    "VantageProject": VantageProject,
-    "VantageI2VSingleLooper": VantageSingleLooperI2V,
-    "VantageI2VDualLooper": VantageDualLooperI2V,
+    "NebulaProject": NebulaProject,
+    "NebulaI2VSingleLooper": NebulaSingleLooperI2V,
+    "NebulaI2VDualLooper": NebulaDualLooperI2V,
+    "NebulaLivePreview": NebulaLivePreview,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "VantageProject": "Vantage Project Loader",
-    "VantageI2VSingleLooper": "Vantage I2V Single Model Looper",
-    "VantageI2VDualLooper": "Vantage I2V Dual Model Looper",
+    "NebulaProject": "Nebula Project Loader",
+    "NebulaI2VSingleLooper": "Nebula I2V Single Model Looper",
+    "NebulaI2VDualLooper": "Nebula I2V Dual Model Looper",
+    "NebulaLivePreview": "Nebula Live Preview",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY", "preload"]
